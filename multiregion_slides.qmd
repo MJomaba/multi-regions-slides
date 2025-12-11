@@ -1,0 +1,120 @@
+---
+title: "Bayesian Mixed-Effects Modeling for Epidemics"
+author: "Marc Baguelin & Ed Knock"
+format:
+  revealjs:
+    theme: [default]
+    slide-number: true
+    highlight-style: github
+    chalkboard: false
+    controls: true
+    incremental: false
+    center: false
+    width: 1400
+    height: 800
+    transition: none
+    toc: false
+fontsize: 18pt
+---
+
+# Overview of the framework
+
+## Motivation
+
+- Traditional epidemic models are often fitted to **single outbreaks**, limiting information sharing across regions.
+- Mixed-effects are standard in PK/within-host modeling but have **not** been adapted to **transmission dynamics** at population level.
+
+## Our contribution
+
+- **Bayesian hierarchical framework** for **multi-region** epidemic modeling.
+- **Features**
+  - Full **uncertainty quantification** via priors/posteriors
+  - **Parallelizable** inference
+  - **Transmission-aware** model specification via a high-level DSL (e.g., *odin*)
+
+## Applications
+
+- Toy **SIR** model
+- Multi-region **COVID-19 severity** estimation in England
+
+::: aside
+## Hierarchical structure (diagram)
+```{mermaid}
+flowchart TB
+  phi(("φ")):::global
+  subgraph locals[Local parameters]
+    th1(("θ₁")):::local
+    th2(("θ₂")):::local
+    th3(("θ₃")):::local
+  end
+  y1["y₁"]:::obs
+  y2["y₂"]:::obs
+  y3["y₃"]:::obs
+
+  phi --> th1 --> y1
+  phi --> th2 --> y2
+  phi --> th3 --> y3
+
+  classDef global fill:#2b6cb0,stroke:#1a4d7a,stroke-width:2,color:#fff;
+  classDef local fill:#90cdf4,stroke:#2b6cb0,stroke-width:1.5,color:#000;
+  classDef obs fill:#ffffff,stroke:#2b6cb0,stroke-dasharray: 3 3,color:#000;
+```
+:::
+
+---
+
+# Hierarchical model factorisation
+
+## Structure
+
+Let groups be $G=\{1,\dots,K\}$. For each group $i$ we observe data $y_i$ with **local** parameters $\theta_i$ and **global** parameters $\phi$ shared across groups.
+
+## Posterior factorisation (Bayesian)
+
+$$
+\log p(\phi,\{\theta_i\}_{i=1}^K\mid y) 
+= \sum_{i=1}^K \log p(y_i\mid \theta_i,\phi)
+ + \sum_{i=1}^K \log p(\theta_i\mid \phi)
+ + \log p(\phi)\,.
+$$
+
+Equivalent non-Bayesian readings:
+
+1. **Mixed-effects marginal likelihood**: integrate out $\theta_i$.
+2. **Penalised likelihood**: take $R_i(\theta_i\mid\phi) \propto e^{-\lambda_i J_i(\theta_i;\phi)}$ and $R_0(\phi) \propto e^{-\lambda_0 J_0(\phi)}$.
+
+## Computation (blocked, parallel)
+
+- Conditional on $\phi$, locals $\{\theta_i\}$ update **in parallel**.
+- Global update targets $\phi$ using $\sum_i(\log L_i+\log R_i)+\log R_0$.
+
+::: aside
+## Factorisation diagram
+```{mermaid}
+flowchart LR
+  subgraph Likelihoods[Local likelihoods]
+    L1["log L₁(y₁|θ₁,φ)"]
+    L2["log L₂(y₂|θ₂,φ)"]
+    Lk["⋯ log L_K(y_K|θ_K,φ)"]
+  end
+  subgraph Priors[Local regularisation]
+    R1["log R₁(θ₁|φ)"]
+    R2["log R₂(θ₂|φ)"]
+    Rk["⋯ log R_K(θ_K|φ)"]
+  end
+  R0["log R₀(φ)"]
+  Sum["log posterior"]:::sum
+
+  L1 --> Sum
+  L2 --> Sum
+  Lk --> Sum
+  R1 --> Sum
+  R2 --> Sum
+  Rk --> Sum
+  R0 --> Sum
+
+  classDef sum fill:#2b6cb0,stroke:#1a4d7a,color:#fff,font-weight:bold;
+```
+:::
+
+
