@@ -1,75 +1,46 @@
 ---
-title: "Bayesian Mixed-Effects Modeling for Epidemics"
+title: "Multi-regions Modelling"
 author: "Marc Baguelin & Ed Knock"
 format:
   revealjs:
-    theme: [default]
+    theme: dark
     slide-number: true
     highlight-style: github
-    chalkboard: false
+    chalkboard: true
     controls: true
     incremental: false
     center: false
-    width: 1400
-    height: 800
     transition: none
     toc: false
 fontsize: 18pt
 ---
 
-# Overview of the framework
+## Overview of the framework
 
-## Motivation
+### Motivation
 
 - Traditional epidemic models are often fitted to **single outbreaks**, limiting information sharing across regions.
-- Mixed-effects are standard in PK/within-host modeling but have **not** been adapted to **transmission dynamics** at population level.
+- Mixed-effects/hierarchical models are standard in PK/within-host modeling but have not been adapted to **transmission dynamics** at population level.
 
-## Our contribution
+### Our objective
 
 - **Bayesian hierarchical framework** for **multi-region** epidemic modeling.
 - **Features**
   - Full **uncertainty quantification** via priors/posteriors
   - **Parallelizable** inference
-  - **Transmission-aware** model specification via a high-level DSL (e.g., *odin*)
+  - Model specification via a high-level DSL (`odin` and `monty`)
 
-## Applications
+## Hierarchical structure
 
-- Toy **SIR** model
-- Multi-region **COVID-19 severity** estimation in England
+![](Hierarchical_diag.png){width=300}
 
-::: aside
-## Hierarchical structure (diagram)
-```{mermaid}
-flowchart TB
-  phi(("φ")):::global
-  subgraph locals[Local parameters]
-    th1(("θ₁")):::local
-    th2(("θ₂")):::local
-    th3(("θ₃")):::local
-  end
-  y1["y₁"]:::obs
-  y2["y₂"]:::obs
-  y3["y₃"]:::obs
+## Hierarchical model factorisation
 
-  phi --> th1 --> y1
-  phi --> th2 --> y2
-  phi --> th3 --> y3
-
-  classDef global fill:#2b6cb0,stroke:#1a4d7a,stroke-width:2,color:#fff;
-  classDef local fill:#90cdf4,stroke:#2b6cb0,stroke-width:1.5,color:#000;
-  classDef obs fill:#ffffff,stroke:#2b6cb0,stroke-dasharray: 3 3,color:#000;
-```
-:::
-
----
-
-# Hierarchical model factorisation
-
-## Structure
+### Structure
 
 Let groups be $G=\{1,\dots,K\}$. For each group $i$ we observe data $y_i$ with **local** parameters $\theta_i$ and **global** parameters $\phi$ shared across groups.
 
-## Posterior factorisation (Bayesian)
+### Posterior factorisation (Bayesian)
 
 $$
 \log p(\phi,\{\theta_i\}_{i=1}^K\mid y) 
@@ -78,43 +49,31 @@ $$
  + \log p(\phi)\,.
 $$
 
-Equivalent non-Bayesian readings:
+Here we are Bayesian but also has non-Bayesian interpretation.
 
-1. **Mixed-effects marginal likelihood**: integrate out $\theta_i$.
-2. **Penalised likelihood**: take $R_i(\theta_i\mid\phi) \propto e^{-\lambda_i J_i(\theta_i;\phi)}$ and $R_0(\phi) \propto e^{-\lambda_0 J_0(\phi)}$.
-
-## Computation (blocked, parallel)
+### Computation (blocked, parallel)
 
 - Conditional on $\phi$, locals $\{\theta_i\}$ update **in parallel**.
 - Global update targets $\phi$ using $\sum_i(\log L_i+\log R_i)+\log R_0$.
 
-::: aside
-## Factorisation diagram
-```{mermaid}
-flowchart LR
-  subgraph Likelihoods[Local likelihoods]
-    L1["log L₁(y₁|θ₁,φ)"]
-    L2["log L₂(y₂|θ₂,φ)"]
-    Lk["⋯ log L_K(y_K|θ_K,φ)"]
-  end
-  subgraph Priors[Local regularisation]
-    R1["log R₁(θ₁|φ)"]
-    R2["log R₂(θ₂|φ)"]
-    Rk["⋯ log R_K(θ_K|φ)"]
-  end
-  R0["log R₀(φ)"]
-  Sum["log posterior"]:::sum
+## Where are we now?
 
-  L1 --> Sum
-  L2 --> Sum
-  Lk --> Sum
-  R1 --> Sum
-  R2 --> Sum
-  Rk --> Sum
-  R0 --> Sum
+### What already exists
+- odin models and can be run and in "groups" in dust-> see script
+- A global likelihood can be derived from this
+- Packers can use the hierarchical structure
+- Densities can be written as functions
+- Model can be fit using existing algorithms
 
-  classDef sum fill:#2b6cb0,stroke:#1a4d7a,color:#fff,font-weight:bold;
-```
-:::
+### What remains to be done
+- fitting algorithms do not exploit the hierarchical structure
+- not possible to output individual 'regional' likelihoods
+- not possible to handle groups in monty DSL
+
+## Workplan
+
+- Setup grouped models in monty properly (and combining of grouped models), and ensure dust outputs likelihoods by group
+- Work on nested algorithm and ensure observations are handled correctly
+- Handle groups in the monty DSL
 
 
